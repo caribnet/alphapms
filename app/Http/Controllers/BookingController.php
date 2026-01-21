@@ -7,10 +7,25 @@ use App\Models\Room;
 use App\Models\Guest;
 use App\Models\RoomType;
 use App\Models\Invoice;
+use App\Models\WholesalerRate;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
 
 class BookingController extends Controller
 {
+    public function stats()
+    {
+        $today = Carbon::today()->toDateString();
+        
+        $arrivals = Booking::where('check_in', $today)->count();
+        $availableRooms = Room::where('status', 'available')->count();
+        
+        return response()->json([
+            'arrivals' => $arrivals,
+            'available_rooms' => $availableRooms,
+        ]);
+    }
+
     public function index()
     {
         return Booking::with(['guest', 'room', 'roomType', 'invoices'])->get();
@@ -45,10 +60,17 @@ class BookingController extends Controller
             // Check for wholesaler rate
             $rate = $roomType->base_rate;
             if (!empty($validated['wholesaler_id'])) {
-                $specialRate = \App\Models\WholesalerRate::where('wholesaler_id', $validated['wholesaler_id'])
+                $specialRate = WholesalerRate::where('wholesaler_id', $validated['wholesaler_id'])
                     ->where('room_type_id', $roomType->id)
-                    ->where('start_date', '<=', $validated['check_in'])
-                    ->where('end_date', '>=', $validated['check_in'])
+                    ->where(function($query) use ($validated) {
+                        $query->where(function($q) use ($validated) {
+                            $q->where('start_date', '<=', $validated['check_in'])
+                              ->where('end_date', '>=', $validated['check_in']);
+                        })->orWhere(function($q) use ($validated) {
+                            $q->where('start_date', '<=', $validated['check_out'])
+                              ->where('end_date', '>=', $validated['check_out']);
+                        });
+                    })
                     ->first();
                 
                 if ($specialRate) {

@@ -86,6 +86,7 @@
 
         <div id="section-wholesalers" style="display:none;">
             <h2>Wholesalers</h2>
+            <button class="btn btn-primary mb-3" onclick="openWholesalerRateModal()">Set Wholesaler Rate</button>
             <table class="table table-striped">
                 <thead>
                     <tr>
@@ -93,9 +94,24 @@
                         <th>Contact</th>
                         <th>Email</th>
                         <th>Commission %</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="wholesalers-table-body"></tbody>
+            </table>
+
+            <h3 class="mt-4">Current Rates</h3>
+            <table class="table table-sm table-bordered">
+                <thead>
+                    <tr>
+                        <th>Wholesaler</th>
+                        <th>Room Type</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Rate</th>
+                    </tr>
+                </thead>
+                <tbody id="wholesaler-rates-table-body"></tbody>
             </table>
         </div>
 
@@ -184,6 +200,43 @@
         </div>
     </div>
 
+    <!-- Wholesaler Rate Modal -->
+    <div class="modal fade" id="rateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Set Wholesaler Rate</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="rateForm">
+                        <div class="mb-3">
+                            <label class="form-label">Wholesaler</label>
+                            <select class="form-control" name="wholesaler_id" id="rate-wholesaler" required></select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Room Type</label>
+                            <select class="form-control" name="room_type_id" id="rate-room-type" required></select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" class="form-control" name="start_date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">End Date</label>
+                            <input type="date" class="form-control" name="end_date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Rate per Night ($)</label>
+                            <input type="number" step="0.01" class="form-control" name="rate" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Rate</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function showSection(sectionId) {
@@ -193,7 +246,12 @@
         }
 
         async function loadData(section) {
-            if (section === 'bookings') {
+            if (section === 'dashboard') {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                document.getElementById('count-arrivals').innerText = data.arrivals;
+                document.getElementById('count-available').innerText = data.available_rooms;
+            } else if (section === 'bookings') {
                 const res = await fetch('/api/bookings');
                 const bookings = await res.json();
                 renderBookings(bookings);
@@ -205,6 +263,10 @@
                 const res = await fetch('/api/wholesalers');
                 const data = await res.json();
                 renderWholesalers(data);
+                
+                const resRates = await fetch('/api/wholesaler-rates');
+                const rates = await resRates.json();
+                renderWholesalerRates(rates);
             } else if (section === 'accounting') {
                 const res = await fetch('/api/invoices');
                 const data = await res.json();
@@ -262,8 +324,63 @@
                     <td>${w.contact_person}</td>
                     <td>${w.email}</td>
                     <td>${w.commission_rate}%</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" onclick="viewWholesalerBookings(${w.id})">Bookings</button>
+                    </td>
                 </tr>
             `).join('');
+        }
+
+        function renderWholesalerRates(rates) {
+            const body = document.getElementById('wholesaler-rates-table-body');
+            body.innerHTML = rates.map(r => `
+                <tr>
+                    <td>${r.wholesaler.name}</td>
+                    <td>${r.room_type.name}</td>
+                    <td>${r.start_date}</td>
+                    <td>${r.end_date}</td>
+                    <td>$${r.rate}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function openWholesalerRateModal() {
+            const resWholesalers = await fetch('/api/wholesalers');
+            const wholesalers = await resWholesalers.json();
+            const selectWholesaler = document.getElementById('rate-wholesaler');
+            selectWholesaler.innerHTML = wholesalers.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+
+            const resTypes = await fetch('/api/room-types');
+            const types = await resTypes.json();
+            const selectType = document.getElementById('rate-room-type');
+            selectType.innerHTML = types.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+            const modal = new bootstrap.Modal(document.getElementById('rateModal'));
+            modal.show();
+        }
+
+        document.getElementById('rateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            
+            const res = await fetch('/api/wholesaler-rates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('rateModal')).hide();
+                loadData('wholesalers');
+            } else {
+                alert('Error saving rate');
+            }
+        });
+
+        async function viewWholesalerBookings(id) {
+            // Not implemented in this view but can be added
+            alert('View bookings for wholesaler ' + id);
         }
 
         function renderAccounting(invoices) {

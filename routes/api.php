@@ -14,6 +14,7 @@ Route::get('/room-types', [RoomController::class, 'roomTypes']);
 Route::post('/room-types', [RoomController::class, 'storeRoomType']);
 
 // Bookings
+Route::get('/stats', [BookingController::class, 'stats']);
 Route::get('/bookings', [BookingController::class, 'index']);
 Route::post('/bookings', [BookingController::class, 'store']);
 Route::post('/bookings/{booking}/assign-room', [BookingController::class, 'assignRoom']);
@@ -24,6 +25,8 @@ Route::post('/bookings/{booking}/check-out', [BookingController::class, 'checkOu
 Route::get('/wholesalers', [WholesalerController::class, 'index']);
 Route::post('/wholesalers', [WholesalerController::class, 'store']);
 Route::get('/wholesalers/{wholesaler}', [WholesalerController::class, 'show']);
+Route::get('/wholesaler-rates', [WholesalerController::class, 'rates']);
+Route::post('/wholesaler-rates', [WholesalerController::class, 'storeRate']);
 
 // Accounting
 Route::get('/invoices', [AccountingController::class, 'index']);
