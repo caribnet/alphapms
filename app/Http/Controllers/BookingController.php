@@ -58,10 +58,15 @@ class BookingController extends Controller
         $totalPrice = $rate * $nights;
 
         // 3. Create the Booking
+        $wholesalerId = $validated['wholesaler_id'] ?? null;
+        if (empty($wholesalerId)) {
+            $wholesalerId = null;
+        }
+
         $booking = Booking::create([
             'guest_id' => $guest->id,
             'room_type_id' => $validated['room_type_id'],
-            'wholesaler_id' => $validated['wholesaler_id'] ?? null,
+            'wholesaler_id' => $wholesalerId,
             'check_in' => $validated['check_in'],
             'check_out' => $validated['check_out'],
             'total_price' => $totalPrice,

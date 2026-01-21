@@ -370,6 +370,11 @@
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData.entries());
             
+            // Ensure empty wholesaler_id is null
+            if (data.wholesaler_id === "") {
+                data.wholesaler_id = null;
+            }
+            
             const res = await fetch('/api/bookings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
