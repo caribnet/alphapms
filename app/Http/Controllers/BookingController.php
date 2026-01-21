@@ -18,69 +18,72 @@ class BookingController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'first_name' => 'required|string',
-            'last_name' => 'required|string',
-            'email' => 'required|email',
-            'room_type_id' => 'required|exists:room_types,id',
-            'wholesaler_id' => 'nullable|exists:wholesalers,id',
-            'check_in' => 'required|date',
-            'check_out' => 'required|date|after:check_in',
-        ]);
+        try {
+            $validated = $request->validate([
+                'first_name' => 'required|string',
+                'last_name' => 'required|string',
+                'email' => 'required|email',
+                'room_type_id' => 'required|exists:room_types,id',
+                'wholesaler_id' => 'nullable',
+                'check_in' => 'required|date',
+                'check_out' => 'required|date|after:check_in',
+            ]);
 
-        // 1. Find or create the guest
-        $guest = Guest::firstOrCreate(
-            ['email' => $validated['email']],
-            ['first_name' => $validated['first_name'], 'last_name' => $validated['last_name']]
-        );
+            // 1. Find or create the guest
+            $guest = Guest::firstOrCreate(
+                ['email' => $validated['email']],
+                ['first_name' => $validated['first_name'], 'last_name' => $validated['last_name']]
+            );
 
-        // 2. Calculate Total Price
-        $roomType = RoomType::find($validated['room_type_id']);
-        $checkIn = new \DateTime($validated['check_in']);
-        $checkOut = new \DateTime($validated['check_out']);
-        $nights = $checkIn->diff($checkOut)->days;
-        $nights = $nights > 0 ? $nights : 1;
+            // 2. Calculate Total Price
+            $roomType = RoomType::find($validated['room_type_id']);
+            $checkIn = new \DateTime($validated['check_in']);
+            $checkOut = new \DateTime($validated['check_out']);
+            $nights = $checkIn->diff($checkOut)->days;
+            $nights = $nights > 0 ? $nights : 1;
 
-        // Check for wholesaler rate
-        $rate = $roomType->base_rate;
-        if ($request->has('wholesaler_id') && !empty($request->wholesaler_id)) {
-            $specialRate = \App\Models\WholesalerRate::where('wholesaler_id', $request->wholesaler_id)
-                ->where('room_type_id', $roomType->id)
-                ->where('start_date', '<=', $validated['check_in'])
-                ->where('end_date', '>=', $validated['check_in'])
-                ->first();
-            
-            if ($specialRate) {
-                $rate = $specialRate->rate;
+            // Check for wholesaler rate
+            $rate = $roomType->base_rate;
+            if (!empty($validated['wholesaler_id'])) {
+                $specialRate = \App\Models\WholesalerRate::where('wholesaler_id', $validated['wholesaler_id'])
+                    ->where('room_type_id', $roomType->id)
+                    ->where('start_date', '<=', $validated['check_in'])
+                    ->where('end_date', '>=', $validated['check_in'])
+                    ->first();
+                
+                if ($specialRate) {
+                    $rate = $specialRate->rate;
+                }
             }
+
+            $totalPrice = $rate * $nights;
+
+            // 3. Create the Booking
+            $wholesalerId = !empty($validated['wholesaler_id']) ? $validated['wholesaler_id'] : null;
+
+            $booking = Booking::create([
+                'guest_id' => $guest->id,
+                'room_type_id' => $validated['room_type_id'],
+                'wholesaler_id' => $wholesalerId,
+                'check_in' => $validated['check_in'],
+                'check_out' => $validated['check_out'],
+                'total_price' => $totalPrice,
+                'status' => 'pending'
+            ]);
+
+            // 4. Automatically generate Invoice
+            Invoice::create([
+                'booking_id' => $booking->id,
+                'amount' => $totalPrice,
+                'status' => 'unpaid'
+            ]);
+
+            return response()->json($booking->load('guest', 'roomType'), 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['error' => 'Validation failed', 'messages' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Server error', 'message' => $e->getMessage()], 500);
         }
-
-        $totalPrice = $rate * $nights;
-
-        // 3. Create the Booking
-        $wholesalerId = $validated['wholesaler_id'] ?? null;
-        if (empty($wholesalerId)) {
-            $wholesalerId = null;
-        }
-
-        $booking = Booking::create([
-            'guest_id' => $guest->id,
-            'room_type_id' => $validated['room_type_id'],
-            'wholesaler_id' => $wholesalerId,
-            'check_in' => $validated['check_in'],
-            'check_out' => $validated['check_out'],
-            'total_price' => $totalPrice,
-            'status' => 'pending'
-        ]);
-
-        // 4. Automatically generate Invoice
-        Invoice::create([
-            'booking_id' => $booking->id,
-            'amount' => $totalPrice,
-            'status' => 'unpaid'
-        ]);
-
-        return response()->json($booking->load('guest', 'roomType'), 201);
     }
 
     public function assignRoom(Request $request, Booking $booking)

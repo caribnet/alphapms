@@ -385,7 +385,14 @@
                 bootstrap.Modal.getInstance(document.getElementById('bookingModal')).hide();
                 showSection('bookings');
             } else {
-                alert('Error creating booking');
+                const errorData = await res.json();
+                let message = 'Error creating booking: ';
+                if (errorData.messages) {
+                    message += Object.values(errorData.messages).flat().join(', ');
+                } else {
+                    message += errorData.message || 'Unknown error';
+                }
+                alert(message);
             }
         });
 
