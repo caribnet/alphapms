@@ -238,10 +238,20 @@
                     <td>${r.room_type.name}</td>
                     <td><span class="badge ${getStatusClass(r.status)}">${r.status}</span></td>
                     <td>
+                        ${r.status === 'dirty' ? `<button class="btn btn-sm btn-success" onclick="markRoomClean(${r.id})">Mark Clean</button>` : ''}
                         <button class="btn btn-sm btn-secondary" onclick="editRoom(${r.id})">Edit</button>
                     </td>
                 </tr>
             `).join('');
+        }
+
+        async function markRoomClean(roomId) {
+            const res = await fetch(`/api/rooms/${roomId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'available' })
+            });
+            if (res.ok) loadData('rooms');
         }
 
         function renderWholesalers(wholesalers) {
