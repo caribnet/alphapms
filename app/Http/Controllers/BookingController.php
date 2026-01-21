@@ -6,13 +6,14 @@ use App\Models\Booking;
 use App\Models\Room;
 use App\Models\Guest;
 use App\Models\RoomType;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
 {
     public function index()
     {
-        return Booking::with(['guest', 'room', 'roomType'])->get();
+        return Booking::with(['guest', 'room', 'roomType', 'invoices'])->get();
     }
 
     public function store(Request $request)
@@ -40,9 +41,9 @@ class BookingController extends Controller
         $nights = $checkIn->diff($checkOut)->days;
         $nights = $nights > 0 ? $nights : 1;
 
-        // Check for wholesaler rate if wholesaler_id is provided
+        // Check for wholesaler rate
         $rate = $roomType->base_rate;
-        if ($request->has('wholesaler_id')) {
+        if ($request->has('wholesaler_id') && !empty($request->wholesaler_id)) {
             $specialRate = \App\Models\WholesalerRate::where('wholesaler_id', $request->wholesaler_id)
                 ->where('room_type_id', $roomType->id)
                 ->where('start_date', '<=', $validated['check_in'])
@@ -65,6 +66,13 @@ class BookingController extends Controller
             'check_out' => $validated['check_out'],
             'total_price' => $totalPrice,
             'status' => 'pending'
+        ]);
+
+        // 4. Automatically generate Invoice
+        Invoice::create([
+            'booking_id' => $booking->id,
+            'amount' => $totalPrice,
+            'status' => 'unpaid'
         ]);
 
         return response()->json($booking->load('guest', 'roomType'), 201);

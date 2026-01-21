@@ -28,16 +28,17 @@ class AccountingController extends Controller
     public function recordPayment(Request $request, Invoice $invoice)
     {
         $validated = $request->validate([
-            'amount' => 'required|numeric|min:0.01',
+            'amount' => 'required|numeric',
             'payment_method' => 'required|string',
-            'paid_at' => 'required|date',
         ]);
+
+        $paymentAmount = $validated['amount'] > 0 ? $validated['amount'] : $invoice->amount;
 
         $payment = Payment::create([
             'invoice_id' => $invoice->id,
-            'amount' => $validated['amount'],
+            'amount' => $paymentAmount,
             'payment_method' => $validated['payment_method'],
-            'paid_at' => $validated['paid_at']
+            'paid_at' => now()
         ]);
 
         $totalPaid = $invoice->payments()->sum('amount');

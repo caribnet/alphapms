@@ -83,6 +83,38 @@
                 <tbody id="rooms-table-body"></tbody>
             </table>
         </div>
+
+        <div id="section-wholesalers" style="display:none;">
+            <h2>Wholesalers</h2>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Contact</th>
+                        <th>Email</th>
+                        <th>Commission %</th>
+                    </tr>
+                </thead>
+                <tbody id="wholesalers-table-body"></tbody>
+            </table>
+        </div>
+
+        <div id="section-accounting" style="display:none;">
+            <h2>Accounting & Invoices</h2>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Guest</th>
+                        <th>Booking Status</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="accounting-table-body"></tbody>
+            </table>
+        </div>
         
         <!-- More sections can be added here -->
     </div>
@@ -132,6 +164,26 @@
         </div>
     </div>
 
+    <!-- Room Assignment Modal -->
+    <div class="modal fade" id="assignModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Assign Room</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="assign-booking-id">
+                    <div class="mb-3">
+                        <label class="form-label">Available Rooms</label>
+                        <select class="form-control" id="assign-room-select"></select>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="submitRoomAssignment()">Assign Room</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function showSection(sectionId) {
@@ -149,6 +201,14 @@
                 const res = await fetch('/api/rooms');
                 const rooms = await res.json();
                 renderRooms(rooms);
+            } else if (section === 'wholesalers') {
+                const res = await fetch('/api/wholesalers');
+                const data = await res.json();
+                renderWholesalers(data);
+            } else if (section === 'accounting') {
+                const res = await fetch('/api/invoices');
+                const data = await res.json();
+                renderAccounting(data);
             }
         }
 
@@ -182,6 +242,100 @@
                     </td>
                 </tr>
             `).join('');
+        }
+
+        function renderWholesalers(wholesalers) {
+            const body = document.getElementById('wholesalers-table-body');
+            body.innerHTML = wholesalers.map(w => `
+                <tr>
+                    <td>${w.name}</td>
+                    <td>${w.contact_person}</td>
+                    <td>${w.email}</td>
+                    <td>${w.commission_rate}%</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderAccounting(invoices) {
+            const body = document.getElementById('accounting-table-body');
+            body.innerHTML = invoices.map(i => `
+                <tr>
+                    <td>INV-${i.id.toString().padStart(4, '0')}</td>
+                    <td>${i.booking.guest.first_name} ${i.booking.guest.last_name}</td>
+                    <td>${i.booking.status}</td>
+                    <td>$${i.amount}</td>
+                    <td><span class="badge ${i.status === 'paid' ? 'bg-success' : 'bg-warning'}">${i.status}</span></td>
+                    <td>
+                        ${i.status !== 'paid' ? `<button class="btn btn-sm btn-primary" onclick="payInvoice(${i.id})">Mark Paid</button>` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function payInvoice(invoiceId) {
+            const res = await fetch(`/api/invoices/${invoiceId}/payments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount: 0, payment_method: 'Manual' }) // amount 0 in recordPayment logic can mean pay full
+            });
+            if (res.ok) loadData('accounting');
+        }
+
+        async function assignRoom(bookingId) {
+            // Find the booking to know the room type
+            const resBookings = await fetch('/api/bookings');
+            const bookings = await resBookings.json();
+            const booking = bookings.find(b => b.id === bookingId);
+
+            // Fetch available rooms of that type
+            const resRooms = await fetch('/api/rooms');
+            const rooms = await resRooms.json();
+            const availableRooms = rooms.filter(r => r.status === 'available' && r.room_type_id === booking.room_type_id);
+
+            const select = document.getElementById('assign-room-select');
+            if (availableRooms.length === 0) {
+                select.innerHTML = '<option value="">No available rooms of this type</option>';
+            } else {
+                select.innerHTML = availableRooms.map(r => `<option value="${r.id}">Room ${r.room_number}</option>`).join('');
+            }
+
+            document.getElementById('assign-booking-id').value = bookingId;
+            const modal = new bootstrap.Modal(document.getElementById('assignModal'));
+            modal.show();
+        }
+
+        async function submitRoomAssignment() {
+            const bookingId = document.getElementById('assign-booking-id').value;
+            const roomId = document.getElementById('assign-room-select').value;
+
+            if (!roomId) {
+                alert('Please select a room');
+                return;
+            }
+
+            const res = await fetch(`/api/bookings/${bookingId}/assign-room`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ room_id: roomId })
+            });
+
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('assignModal')).hide();
+                loadData('bookings');
+            } else {
+                const error = await res.json();
+                alert('Error: ' + (error.error || 'Could not assign room'));
+            }
+        }
+
+        async function checkIn(bookingId) {
+            const res = await fetch(`/api/bookings/${bookingId}/check-in`, { method: 'POST' });
+            if (res.ok) loadData('bookings');
+        }
+
+        async function checkOut(bookingId) {
+            const res = await fetch(`/api/bookings/${bookingId}/check-out`, { method: 'POST' });
+            if (res.ok) loadData('bookings');
         }
 
         function getStatusClass(status) {
