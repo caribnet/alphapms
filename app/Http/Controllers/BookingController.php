@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Booking;
 use App\Models\Room;
+use App\Models\Guest;
+use App\Models\RoomType;
 use Illuminate\Http\Request;
 
 class BookingController extends Controller
@@ -16,15 +18,39 @@ class BookingController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'guest_id' => 'required|exists:guests,id',
+            'first_name' => 'required|string',
+            'last_name' => 'required|string',
+            'email' => 'required|email',
             'room_type_id' => 'required|exists:room_types,id',
-            'wholesaler_id' => 'nullable|exists:wholesalers,id',
-            'check_in' => 'required|date|after_or_equal:today',
+            'check_in' => 'required|date',
             'check_out' => 'required|date|after:check_in',
-            'total_price' => 'required|numeric',
         ]);
 
-        return Booking::create($validated);
+        // 1. Find or create the guest
+        $guest = Guest::firstOrCreate(
+            ['email' => $validated['email']],
+            ['first_name' => $validated['first_name'], 'last_name' => $validated['last_name']]
+        );
+
+        // 2. Calculate Total Price based on Room Type rate and nights
+        $roomType = RoomType::find($validated['room_type_id']);
+        $checkIn = new \DateTime($validated['check_in']);
+        $checkOut = new \DateTime($validated['check_out']);
+        $nights = $checkIn->diff($checkOut)->days;
+        $nights = $nights > 0 ? $nights : 1;
+        $totalPrice = $roomType->base_rate * $nights;
+
+        // 3. Create the Booking
+        $booking = Booking::create([
+            'guest_id' => $guest->id,
+            'room_type_id' => $validated['room_type_id'],
+            'check_in' => $validated['check_in'],
+            'check_out' => $validated['check_out'],
+            'total_price' => $totalPrice,
+            'status' => 'pending'
+        ]);
+
+        return response()->json($booking->load('guest', 'roomType'), 201);
     }
 
     public function assignRoom(Request $request, Booking $booking)
