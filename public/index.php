@@ -1,6 +1,6 @@
 <?php
 
-use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 
 define('LARAVEL_START', microtime(true));
@@ -17,6 +17,8 @@ $kernel = $app->make(Kernel::class);
 
 $response = $kernel->handle(
     $request = Request::capture()
-)->send();
+);
+
+$response->send();
 
 $kernel->terminate($request, $response);
