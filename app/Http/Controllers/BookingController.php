@@ -22,6 +22,7 @@ class BookingController extends Controller
             'last_name' => 'required|string',
             'email' => 'required|email',
             'room_type_id' => 'required|exists:room_types,id',
+            'wholesaler_id' => 'nullable|exists:wholesalers,id',
             'check_in' => 'required|date',
             'check_out' => 'required|date|after:check_in',
         ]);
@@ -32,18 +33,34 @@ class BookingController extends Controller
             ['first_name' => $validated['first_name'], 'last_name' => $validated['last_name']]
         );
 
-        // 2. Calculate Total Price based on Room Type rate and nights
+        // 2. Calculate Total Price
         $roomType = RoomType::find($validated['room_type_id']);
         $checkIn = new \DateTime($validated['check_in']);
         $checkOut = new \DateTime($validated['check_out']);
         $nights = $checkIn->diff($checkOut)->days;
         $nights = $nights > 0 ? $nights : 1;
-        $totalPrice = $roomType->base_rate * $nights;
+
+        // Check for wholesaler rate if wholesaler_id is provided
+        $rate = $roomType->base_rate;
+        if ($request->has('wholesaler_id')) {
+            $specialRate = \App\Models\WholesalerRate::where('wholesaler_id', $request->wholesaler_id)
+                ->where('room_type_id', $roomType->id)
+                ->where('start_date', '<=', $validated['check_in'])
+                ->where('end_date', '>=', $validated['check_in'])
+                ->first();
+            
+            if ($specialRate) {
+                $rate = $specialRate->rate;
+            }
+        }
+
+        $totalPrice = $rate * $nights;
 
         // 3. Create the Booking
         $booking = Booking::create([
             'guest_id' => $guest->id,
             'room_type_id' => $validated['room_type_id'],
+            'wholesaler_id' => $validated['wholesaler_id'] ?? null,
             'check_in' => $validated['check_in'],
             'check_out' => $validated['check_out'],
             'total_price' => $totalPrice,

@@ -114,6 +114,10 @@
                             <select class="form-control" name="room_type_id" id="booking-room-type" required></select>
                         </div>
                         <div class="mb-3">
+                            <label class="form-label">Wholesaler (Optional)</label>
+                            <select class="form-control" name="wholesaler_id" id="booking-wholesaler"></select>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label">Check In</label>
                             <input type="date" class="form-control" name="check_in" required>
                         </div>
@@ -190,11 +194,19 @@
         }
 
         async function openBookingModal() {
-            const res = await fetch('/api/room-types');
-            const types = await res.json();
-            const select = document.getElementById('booking-room-type');
-            select.innerHTML = types.map(t => `<option value="${t.id}">${t.name} ($${t.base_rate})</option>`).join('');
+            // Fetch Room Types
+            const resTypes = await fetch('/api/room-types');
+            const types = await resTypes.json();
+            const selectType = document.getElementById('booking-room-type');
+            selectType.innerHTML = types.map(t => `<option value="${t.id}">${t.name} ($${t.base_rate})</option>`).join('');
             
+            // Fetch Wholesalers
+            const resWholesalers = await fetch('/api/wholesalers');
+            const wholesalers = await resWholesalers.json();
+            const selectWholesaler = document.getElementById('booking-wholesaler');
+            selectWholesaler.innerHTML = '<option value="">None (Direct Booking)</option>' + 
+                wholesalers.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+
             const modal = new bootstrap.Modal(document.getElementById('bookingModal'));
             modal.show();
         }
