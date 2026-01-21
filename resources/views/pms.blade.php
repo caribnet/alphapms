@@ -87,6 +87,48 @@
         <!-- More sections can be added here -->
     </div>
 
+    <!-- Booking Modal -->
+    <div class="modal fade" id="bookingModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">New Booking</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="bookingForm">
+                        <div class="mb-3">
+                            <label class="form-label">First Name</label>
+                            <input type="text" class="form-control" name="first_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Last Name</label>
+                            <input type="text" class="form-control" name="last_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Room Type</label>
+                            <select class="form-control" name="room_type_id" id="booking-room-type" required></select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Check In</label>
+                            <input type="date" class="form-control" name="check_in" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Check Out</label>
+                            <input type="date" class="form-control" name="check_out" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Booking</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function showSection(sectionId) {
             document.querySelectorAll('.main-content > div').forEach(div => div.style.display = 'none');
@@ -146,6 +188,35 @@
                 default: return 'bg-secondary';
             }
         }
+
+        async function openBookingModal() {
+            const res = await fetch('/api/room-types');
+            const types = await res.json();
+            const select = document.getElementById('booking-room-type');
+            select.innerHTML = types.map(t => `<option value="${t.id}">${t.name} ($${t.base_rate})</option>`).join('');
+            
+            const modal = new bootstrap.Modal(document.getElementById('bookingModal'));
+            modal.show();
+        }
+
+        document.getElementById('bookingForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            
+            const res = await fetch('/api/bookings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('bookingModal')).hide();
+                showSection('bookings');
+            } else {
+                alert('Error creating booking');
+            }
+        });
 
         // Initial load
         showSection('dashboard');
