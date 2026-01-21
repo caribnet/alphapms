@@ -8,6 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('email')->unique();
+            $table->string('password');
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
         Schema::create('room_types', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -84,5 +93,6 @@ return new class extends Migration
         Schema::dropIfExists('guests');
         Schema::dropIfExists('rooms');
         Schema::dropIfExists('room_types');
+        Schema::dropIfExists('users');
     }
 };
