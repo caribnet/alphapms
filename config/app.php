@@ -35,6 +35,11 @@ return [
         Illuminate\Translation\TranslationServiceProvider::class,
         Illuminate\Validation\ValidationServiceProvider::class,
         Illuminate\View\ViewServiceProvider::class,
+
+        /*
+         * Application Service Providers...
+         */
+        App\Providers\RouteServiceProvider::class,
     ],
     'aliases' => [
         'App' => Illuminate\Support\Facades\App::class,
